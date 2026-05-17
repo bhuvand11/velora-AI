@@ -1,0 +1,11 @@
+file 'D:\GitHub\velora-AI\temp_frames\scene_1.png'
+duration 5
+file 'D:\GitHub\velora-AI\temp_frames\scene_2.png'
+duration 4
+file 'D:\GitHub\velora-AI\temp_frames\scene_3.png'
+duration 5
+file 'D:\GitHub\velora-AI\temp_frames\scene_4.png'
+duration 4
+file 'D:\GitHub\velora-AI\temp_frames\scene_5.png'
+duration 6
+file 'D:\GitHub\velora-AI\temp_frames\scene_5.png'
