@@ -9,34 +9,42 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 load_dotenv()
 
 # ─────────────────────────────────────────────
-# LLM — GitHub Models
+# LLM — Groq
 # ─────────────────────────────────────────────
-
-
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     groq_api_key=os.getenv("GROQ_API_KEY"),
 )
 
+
 # ─────────────────────────────────────────────
 # TOOL 1 — Script → Storyboard
 # ─────────────────────────────────────────────
 @tool
-def storyboard_generator(script: str) -> str:
-    """Takes a script and splits it into 5 scenes with shot descriptions, captions, duration and mood."""
+def generate_storyboard(script: str) -> str:
+    """Generate a storyboard from a script."""
     resp = llm.invoke(f"""
-You are a professional video director. Split this script into exactly 5 scenes.
+You are a professional Hollywood video director creating a detailed storyboard.
 
-For each scene return a JSON object with:
-- scene_number     : integer (1 to 5)
-- shot_description : string (what the camera sees, 1-2 sentences, vivid and visual)
-- caption          : string (subtitle text, max 8 words)
-- duration_seconds : integer (between 3 and 6)
-- mood             : string (one word e.g. tense, uplifting, melancholic, energetic)
+Split this script into exactly 5 scenes. Return a JSON array where each object has EXACTLY these fields with EXACTLY these names:
 
-Return ONLY a valid JSON array. No markdown. No explanation. No code blocks.
+{{
+  "scene_number": 1,
+  "shot_description": "A sweeping aerial shot of a neon-lit cityscape at dusk, rain falling on glass skyscrapers as yellow taxi cabs weave through congested streets below, the camera slowly descending toward street level.",
+  "caption": "Cities Never Sleep",
+  "duration_seconds": 5,
+  "mood": "dramatic"
+}}
 
-Script:
+STRICT RULES:
+- "shot_description" must be AT LEAST 25 words. Describe camera angle, environment, lighting, subjects, movement, and atmosphere in full vivid detail. NEVER write less than 25 words. NEVER write just a shot type like "establishing shot".
+- "caption" must be 2-6 words of punchy subtitle text. NEVER leave it empty. NEVER use asterisks or markdown. Just plain words.
+- "duration_seconds" must be between 3 and 6. NEVER more than 6.
+- "mood" must be one single word.
+- "scene_number" must be 1 through 5.
+- Return ONLY the JSON array. No markdown. No code blocks. No explanation. Start your response with [ and end with ]
+
+Script to storyboard:
 {script}
 """)
     return resp.content
@@ -47,7 +55,7 @@ Script:
 # ─────────────────────────────────────────────
 @tool
 def coherence_checker(storyboard_json: str) -> str:
-    """Checks if the storyboard tells a coherent story. Returns score and issues."""
+    """Check if the storyboard tells a coherent story. Returns score and issues."""
     resp = llm.invoke(f"""
 You are a film critic. Review this storyboard carefully.
 
@@ -78,7 +86,7 @@ Storyboard:
 # ─────────────────────────────────────────────
 @tool
 def caption_styler(storyboard_json: str, style: str) -> str:
-    """Rewrites captions in the storyboard to match the given style."""
+    """Rewrite captions in the storyboard to match the given style."""
     style_guides = {
         "cinematic"   : "Bold, poetic, epic. Short punchy phrases. Think movie trailer.",
         "documentary" : "Calm, factual, informative. Like a BBC narrator.",
@@ -93,11 +101,11 @@ Rewrite ONLY the caption field in each scene to match this style:
 Style: {style}
 Guide: {guide}
 
-Rules:
+STRICT RULES:
 - Keep scene_number, shot_description, duration_seconds, mood exactly the same
 - Only change the caption text
-- Max 8 words per caption
-- Return ONLY a valid JSON array, no markdown, no explanation
+- caption must be 2-6 plain words. No asterisks. No markdown. No empty captions.
+- Return ONLY a valid JSON array. No markdown. No explanation. Start with [ end with ]
 
 Storyboard:
 {storyboard_json}
@@ -110,7 +118,7 @@ Storyboard:
 # ─────────────────────────────────────────────
 @tool
 def scene_regenerator(weak_scene_number: int, issue: str, full_storyboard_json: str) -> str:
-    """Fixes a specific weak scene based on coherence checker feedback."""
+    """Fix a specific weak scene based on coherence checker feedback."""
     resp = llm.invoke(f"""
 You are a video director fixing a weak scene in a storyboard.
 
@@ -123,7 +131,7 @@ Problem with scene {weak_scene_number}:
 Rewrite ONLY scene {weak_scene_number} to fix this issue.
 Make sure it connects smoothly with scenes before and after it.
 Return the COMPLETE storyboard array with the fixed scene replacing the old one.
-Return ONLY valid JSON. No markdown. No explanation.
+Return ONLY valid JSON. No markdown. No explanation. Start with [ end with ]
 """)
     return resp.content
 
@@ -132,7 +140,7 @@ Return ONLY valid JSON. No markdown. No explanation.
 # AGENT SETUP
 # ─────────────────────────────────────────────
 tools = [
-    storyboard_generator,
+    generate_storyboard,
     coherence_checker,
     caption_styler,
     scene_regenerator
@@ -145,7 +153,7 @@ Your job is to turn a user's script into a polished, coherent storyboard.
 
 Always follow these steps in order:
 
-STEP 1: Call storyboard_generator with the script.
+STEP 1: Call generate_storyboard with the script.
 
 STEP 2: Call coherence_checker with the storyboard JSON from step 1.
 
@@ -155,7 +163,7 @@ STEP 3: Check the coherence_score.
 
 STEP 4: Call caption_styler with the final storyboard and the user's chosen style.
 
-STEP 5: Return the final storyboard JSON only. No explanation. Just the JSON array.
+STEP 5: Return the final storyboard JSON only. No explanation. Just the JSON array. Start with [ end with ]
 
 Important:
 - Never skip steps 1, 2, or 4.
@@ -189,7 +197,11 @@ Settings:
 - Style: {style}
 - Number of scenes: {num_scenes}
 
-Run all steps and return the final styled storyboard as a JSON array.
+Step 1: Call generate_storyboard with the script.
+Step 2: Call coherence_checker with the result.
+Step 3: If coherence_score below 70, call scene_regenerator to fix weak scene.
+Step 4: Call caption_styler with final storyboard and style: {style}
+Return final JSON array only. Start with [ end with ]
 """
     })
 
@@ -200,11 +212,34 @@ Run all steps and return the final styled storyboard as a JSON array.
         start = output.find("[")
         end = output.rfind("]") + 1
         if start != -1 and end > start:
-            scenes = json.loads(output[start:end])
+            raw_scenes = json.loads(output[start:end])
         else:
-            scenes = []
+            raw_scenes = []
     except json.JSONDecodeError:
-        scenes = []
+        raw_scenes = []
+
+    # Normalize all field names and fix values
+    scenes = []
+    for i, scene in enumerate(raw_scenes):
+        scenes.append({
+            "scene_number"    : scene.get("scene_number") or scene.get("scene") or i + 1,
+            "shot_description": (
+                scene.get("shot_description") or
+                scene.get("description") or
+                scene.get("shot") or
+                scene.get("visual") or ""
+            ),
+            "caption": str(
+                scene.get("caption") or
+                scene.get("text") or
+                scene.get("subtitle") or
+                scene.get("title") or ""
+            ).replace("**", "").replace("*", "").strip(),
+            "duration_seconds": min(
+                int(scene.get("duration_seconds") or scene.get("duration") or 4), 6
+            ),
+            "mood": scene.get("mood") or "cinematic"
+        })
 
     # Final coherence check for UI display
     try:
