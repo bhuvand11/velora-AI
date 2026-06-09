@@ -4,6 +4,14 @@
 
 Velora is an end-to-end agentic AI video production pipeline that takes a raw text script and autonomously generates a coherent storyboard, styled captions, and a downloadable MP4 video. Built on LangChain, Groq, Streamlit, and FFmpeg.
 
+## Demo Video
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=ryjj2GlUmt8">
+    <img src="https://img.youtube.com/vi/ryjj2GlUmt8/maxresdefault.jpg" alt="Watch Demo">
+  </a>
+</p>
+
 ---
 
 ## 📋 Table of Contents
