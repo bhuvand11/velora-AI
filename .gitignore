@@ -1,0 +1,11 @@
+velora-env/
+.venv/
+venv/
+
+__pycache__/
+*.pyc
+
+.env
+.env.local
+
+.streamlit/secrets.toml

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\\\\temp_frames\" -Force 2>$null | Select-Object -First 5 | Format-Table Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} -AutoSize)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\\\\velora-env\\\\Lib\\\\site-packages\" -Directory | Where-Object { $_.Name -match \"langchain|groq|pillow|streamlit\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\\", \"C:\\\\Program Files\", \"C:\\\\Program Files \\(x86\\)\", \"$env:USERPROFILE\" -Filter \"ffmpeg.exe\" -Recurse -ErrorAction SilentlyContinue -Depth 4 | Select-Object FullName)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\\\\velora-env\\\\Lib\\\\site-packages\" -Directory | Where-Object { $_.Name -match \"PIL|pillow\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\\\\velora-env\\\\Lib\\\\site-packages\" -Directory | Where-Object { $_.Name -match \"imageio|moviepy\" } | Select-Object Name)",
+      "PowerShell(& \"C:\\\\Users\\\\yasha\\\\Downloads\\\\velora-AI-main\\\\velora-AI-main\\\\velora-env\\\\Scripts\\\\python.exe\" -m pip install imageio-ffmpeg 2>&1)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8501\" -UseBasicParsing -TimeoutSec 5)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8501\" -UseBasicParsing -TimeoutSec 8)",
+      "PowerShell(Stop-Process -Force)",
+      "Bash(python -c \"import langchain_groq\")",
+      "Bash(pip list *)",
+      "Bash(findstr -i \"langchain\\\\|groq\\\\|streamlit\\\\|pillow\\\\|dotenv\")"
+    ]
+  }
+}

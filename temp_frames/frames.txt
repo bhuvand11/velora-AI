@@ -1,0 +1,13 @@
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_1.png'
+duration 5
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_2.png'
+duration 4
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_3.png'
+duration 5
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_4.png'
+duration 4
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_5.png'
+duration 5
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_6.png'
+duration 4
+file 'C:\Users\yasha\Downloads\velora-AI-main\temp_frames\scene_6.png'
