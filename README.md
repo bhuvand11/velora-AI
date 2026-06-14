@@ -100,8 +100,8 @@ velora-AI/
 ├── agent.py              ← LangChain agent + all 4 tools + run_pipeline()
 ├── app.py                ← Streamlit UI
 ├── video_generator.py    ← FFmpeg video rendering pipeline
-├── .env                  ← API keys (never commit this)
-├── .gitignore            ← Ensures .env is never committed
+├── .env                  ← confidenial
+├── .gitignore            ← ignored files
 ├── requirements.txt      ← Python dependencies
 ├── temp_frames/          ← Auto-created during video generation
 └── velora_output.mp4     ← Auto-created video output
