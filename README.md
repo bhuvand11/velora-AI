@@ -208,7 +208,6 @@ LANGSMITH_API_KEY=paste-your-langsmith-key-here
 LANGSMITH_PROJECT=velora
 ```
 
-> ⚠️ **Never commit your `.env` file to GitHub.** Make sure `.env` is listed in your `.gitignore`.
 
 ### Step 3 — Update FFmpeg path in `video_generator.py`
 
