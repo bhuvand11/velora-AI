@@ -1,191 +1,237 @@
 import os
+import shutil
 import subprocess
-import numpy as np
-import imageio_ffmpeg
+import requests
+from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
+from dotenv import load_dotenv
 
-SCENE_COLORS = {
-    1: ("#0d1b2a", "#00b4d8"),
-    2: ("#1a0a0a", "#e63946"),
-    3: ("#0a1a0a", "#52b788"),
-    4: ("#1a1a0a", "#f4a261"),
-    5: ("#0a0a1a", "#9b5de5"),
-    6: ("#1a0a1a", "#f15bb5"),
-    7: ("#0a1a1a", "#00f5d4"),
-    8: ("#1a1209", "#ffd166"),
-}
+load_dotenv()
 
-MOOD_COLORS = {
-    "tense"      : ("#1a1a2e", "#e94560"),
-    "uplifting"  : ("#0f3460", "#f5a623"),
-    "melancholic": ("#2c3e50", "#8e9eab"),
-    "energetic"  : ("#3d0000", "#ff4500"),
-    "calm"       : ("#1a3a4a", "#48cae4"),
-    "dramatic"   : ("#0d0d0d", "#ff0000"),
-    "hopeful"    : ("#1b4332", "#95d5b2"),
-    "reflective" : ("#2d3561", "#a8dadc"),
-    "inspiring"  : ("#1a0533", "#c77dff"),
-    "intense"    : ("#1a0000", "#ff6b6b"),
-    "serious"    : ("#0a0a0a", "#aaaaaa"),
-    "somber"     : ("#0d1117", "#6e7681"),
-    "neutral"    : ("#1a1a1a", "#ffffff"),
-    "cinematic"  : ("#0d1b2a", "#00b4d8"),
-    "determined" : ("#0a0a2a", "#4361ee"),
-    "focused"    : ("#0a1628", "#4895ef"),
-    "epic"       : ("#0a0f1e", "#e8c84a"),
-    "mysterious" : ("#0f0a1a", "#a56cc1"),
-    "romantic"   : ("#1a0a12", "#ff6b9d"),
-    "suspenseful": ("#0d0d0d", "#ff8800"),
-    "serene"     : ("#0a1a2a", "#90e0ef"),
-    "peaceful"   : ("#0a1a10", "#74c69d"),
-}
+STABILITY_API_KEY = os.getenv("STABILITY_API_KEY", "")
+HF_TOKEN          = os.getenv("HF_TOKEN", "")
 
 WIDTH, HEIGHT = 1280, 720
-FPS = 24
+
+MOOD_ACCENTS = {
+    "tense"       : "#e94560",
+    "uplifting"   : "#f5a623",
+    "melancholic" : "#8e9eab",
+    "energetic"   : "#ffd700",
+    "calm"        : "#48cae4",
+    "dramatic"    : "#ff0000",
+    "hopeful"     : "#95d5b2",
+    "reflective"  : "#a8dadc",
+}
+DEFAULT_ACCENT = "#ffffff"
+
+MOOD_FALLBACK_BG = {
+    "tense"       : ("#1a1a2e", "#e94560"),
+    "uplifting"   : ("#0f3460", "#f5a623"),
+    "melancholic" : ("#2c3e50", "#8e9eab"),
+    "energetic"   : ("#ff4500", "#ffd700"),
+    "calm"        : ("#1a3a4a", "#48cae4"),
+    "dramatic"    : ("#0d0d0d", "#ff0000"),
+    "hopeful"     : ("#1b4332", "#95d5b2"),
+    "reflective"  : ("#2d3561", "#a8dadc"),
+}
 
 
-def hex_to_rgb(h: str) -> tuple:
-    h = h.lstrip("#")
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+def _find_ffmpeg():
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        return system_ffmpeg
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        pass
+    return r"C:\ffmpeg-master-latest-win64-gpl-shared\bin\ffmpeg.exe"
 
 
-def clean_text(text: str) -> str:
-    return str(text).replace("**", "").replace("*", "").replace("__", "").replace("`", "").strip()
+FFMPEG_PATH = _find_ffmpeg()
 
 
-def wrap_text(text: str, max_chars: int = 68) -> list:
-    words = text.split()
-    lines, current = [], ""
-    for word in words:
-        candidate = (current + " " + word).strip()
-        if len(candidate) <= max_chars:
-            current = candidate
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+
+def _build_prompt(shot_description: str, mood: str) -> str:
+    return (
+        f"{shot_description}. "
+        f"Cinematic film still, {mood} mood, dramatic lighting, "
+        "professional cinematography, photorealistic, high detail, 16:9"
+    )
+
+
+def _stability_generate(prompt: str):
+    """
+    Stability AI stable-image/generate/core.
+    Returns (Image | None, error_str).
+    """
+    if not STABILITY_API_KEY:
+        return None, "no key"
+    try:
+        resp = requests.post(
+            "https://api.stability.ai/v2beta/stable-image/generate/core",
+            headers={"authorization": f"Bearer {STABILITY_API_KEY}", "accept": "image/*"},
+            files={"none": b""},
+            data={"prompt": prompt, "output_format": "png", "aspect_ratio": "16:9"},
+            timeout=60,
+        )
+        if resp.status_code == 200:
+            return Image.open(BytesIO(resp.content)).convert("RGB"), ""
+        return None, f"HTTP {resp.status_code}: {resp.text[:200]}"
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _huggingface_generate(prompt: str):
+    """
+    Hugging Face Inference API — SDXL (free with a free HF account token).
+    Returns (Image | None, error_str).
+    """
+    if not HF_TOKEN:
+        return None, "no key"
+    try:
+        resp = requests.post(
+            "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            json={"inputs": prompt},
+            timeout=120,
+        )
+        if resp.status_code == 200 and len(resp.content) > 5000:
+            return Image.open(BytesIO(resp.content)).convert("RGB"), ""
+        return None, f"HTTP {resp.status_code}: {resp.text[:200]}"
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _generate_ai_image(shot_description: str, mood: str, scene_number: int = 0):
+    """
+    Try Stability AI first, then Together AI (free FLUX).
+    Returns (PIL Image | None, provider_name).
+    """
+    prompt = _build_prompt(shot_description, mood)
+
+    img, err = _stability_generate(prompt)
+    if img is not None:
+        return img, "Stability AI"
+    if err != "no key":
+        print(f"[Stability AI] scene {scene_number}: {err}")
+
+    img, err = _huggingface_generate(prompt)
+    if img is not None:
+        return img, "HuggingFace SDXL"
+    if err != "no key":
+        print(f"[HuggingFace] scene {scene_number}: {err}")
+
+    return None, "fallback"
+
+
+def _fallback_image(mood: str) -> Image.Image:
+    bg_hex, _ = MOOD_FALLBACK_BG.get(mood, ("#1a1a2e", "#ffffff"))
+    bg_rgb = hex_to_rgb(bg_hex)
+    img = Image.new("RGB", (WIDTH, HEIGHT), color=bg_rgb)
+    draw = ImageDraw.Draw(img)
+    for y in range(HEIGHT):
+        factor = 1 - (y / HEIGHT) * 0.35
+        draw.line(
+            [(0, y), (WIDTH, y)],
+            fill=(int(bg_rgb[0] * factor), int(bg_rgb[1] * factor), int(bg_rgb[2] * factor)),
+        )
+    return img
 
 
 def _load_fonts():
-    sizes = {"label": 22, "desc": 21, "caption": 52}
-    fonts = {}
-    for name, size in sizes.items():
-        try:
-            face = "arialbd.ttf" if name == "caption" else "arial.ttf"
-            fonts[name] = ImageFont.truetype(face, size)
-        except Exception:
-            fonts[name] = ImageFont.load_default()
-    return fonts
+    try:
+        return (
+            ImageFont.truetype("arial.ttf", 52),
+            ImageFont.truetype("arial.ttf", 32),
+            ImageFont.truetype("arial.ttf", 22),
+        )
+    except Exception:
+        d = ImageFont.load_default()
+        return d, d, d
 
 
-def create_scene_image(scene: dict) -> np.ndarray:
-    scene_num = int(scene.get("scene_number") or 1)
-    mood      = str(scene.get("mood") or "").lower().strip()
+def create_scene_image(scene: dict, output_path: str) -> str:
+    """
+    Renders a 1280×720 PNG for one scene.
+    Returns the provider name used ('Stability AI', 'Together AI (FLUX)', 'fallback').
+    """
+    mood      = scene.get("mood", "").lower()
+    shot_desc = scene.get("shot_description") or scene.get("shot", "")
+    scene_num = scene.get("scene_number") or scene.get("scene", 0)
 
-    if scene_num in SCENE_COLORS:
-        bg_hex, accent_hex = SCENE_COLORS[scene_num]
-    elif mood in MOOD_COLORS:
-        bg_hex, accent_hex = MOOD_COLORS[mood]
-    else:
-        bg_hex, accent_hex = ("#0d1b2a", "#00b4d8")
+    base_img, provider = _generate_ai_image(shot_desc, mood, scene_num)
+    if base_img is None:
+        base_img = _fallback_image(mood)
+        provider = "fallback"
 
-    bg_rgb     = hex_to_rgb(bg_hex)
-    accent_rgb = hex_to_rgb(accent_hex)
+    img = base_img.resize((WIDTH, HEIGHT), Image.LANCZOS)
 
-    img  = Image.new("RGB", (WIDTH, HEIGHT), color=bg_rgb)
+    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    ov = ImageDraw.Draw(overlay)
+    ov.rectangle([(0, 0), (WIDTH, 75)], fill=(0, 0, 0, 140))
+    ov.rectangle([(0, HEIGHT - 190), (WIDTH, HEIGHT)], fill=(0, 0, 0, 175))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    # Gradient background
-    for y in range(HEIGHT):
-        t = y / HEIGHT
-        r = max(0, int(bg_rgb[0] * (1 - t * 0.45)))
-        g = max(0, int(bg_rgb[1] * (1 - t * 0.45)))
-        b = max(0, int(bg_rgb[2] * (1 - t * 0.45)))
-        draw.line([(0, y), (WIDTH, y)], fill=(r, g, b))
+    font_large, font_medium, font_small = _load_fonts()
+    accent_rgb = hex_to_rgb(MOOD_ACCENTS.get(mood, DEFAULT_ACCENT))
+    white      = (255, 255, 255)
+    light_gray = (210, 210, 210)
 
-    # Accent borders
-    draw.rectangle([(0, 0),          (WIDTH, 5)],      fill=accent_rgb)
-    draw.rectangle([(0, HEIGHT - 5), (WIDTH, HEIGHT)], fill=accent_rgb)
-    draw.rectangle([(0, 0),          (4, HEIGHT)],     fill=accent_rgb)
+    draw.text((55, 22), f"SCENE {scene_num}", font=font_small, fill=accent_rgb)
+    draw.text((WIDTH - 220, 22), f"[ {mood.upper()} ]", font=font_small, fill=accent_rgb)
 
-    fonts = _load_fonts()
+    caption = (scene.get("caption") or "").upper()
+    bbox = draw.textbbox((0, 0), caption, font=font_large)
+    caption_w = bbox[2] - bbox[0]
+    draw.text(((WIDTH - caption_w) // 2, HEIGHT - 145), caption, font=font_large, fill=white)
 
-    # Header
-    draw.text((40, 20), f"SCENE  {scene_num:02d}", font=fonts["label"], fill=accent_rgb)
-    mood_text = f"[ {mood.upper()} ]"
-    mw = draw.textbbox((0, 0), mood_text, font=fonts["label"])[2]
-    draw.text((WIDTH - mw - 40, 20), mood_text, font=fonts["label"], fill=accent_rgb)
-    draw.line([(40, 56), (WIDTH - 40, 56)], fill=(*accent_rgb,), width=1)
+    duration = scene.get("duration_seconds") or scene.get("duration", 4)
+    draw.text((WIDTH - 95, HEIGHT - 48), f"{duration}s", font=font_small, fill=light_gray)
+    draw.rectangle([(55, HEIGHT - 52), (WIDTH - 55, HEIGHT - 47)], fill=accent_rgb)
 
-    # Shot description (medium length — up to 7 lines)
-    DESC_TOP    = 68
-    CAPTION_TOP = 590
-    LINE_H      = 30
-
-    shot  = clean_text(scene.get("shot_description") or "")
-    lines = wrap_text(shot, max_chars=72)
-    MAX_LINES    = min(7, (CAPTION_TOP - DESC_TOP) // LINE_H)
-    visible      = lines[:MAX_LINES]
-    total_h      = len(visible) * LINE_H
-    y0           = DESC_TOP + max(0, (CAPTION_TOP - DESC_TOP - total_h) // 2)
-
-    for j, line in enumerate(visible):
-        color = (160, 160, 160) if (j == len(visible) - 1 and len(lines) > MAX_LINES) else (210, 210, 210)
-        lw = draw.textbbox((0, 0), line, font=fonts["desc"])[2]
-        draw.text(((WIDTH - lw) // 2, y0 + j * LINE_H), line, font=fonts["desc"], fill=color)
-
-    # Caption
-    caption = clean_text(scene.get("caption") or "").upper()
-    if caption:
-        draw.rectangle([(0, CAPTION_TOP - 6), (WIDTH, HEIGHT - 6)], fill=(*bg_rgb,))
-        cw, ch = draw.textbbox((0, 0), caption, font=fonts["caption"])[2:4]
-        cx = (WIDTH - cw) // 2
-        cy = CAPTION_TOP + ((HEIGHT - 6 - CAPTION_TOP - ch) // 2)
-        draw.text((cx + 2, cy + 2), caption, font=fonts["caption"], fill=(0, 0, 0))
-        draw.text((cx, cy),         caption, font=fonts["caption"], fill=(255, 255, 255))
-
-    return np.array(img)
+    img.save(output_path)
+    return provider
 
 
 def generate_video(scenes: list, output_path: str = "velora_output.mp4") -> str:
-    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-    _write_with_ffmpeg(scenes, output_path, ffmpeg_exe)
-    return output_path
-
-
-def _write_with_ffmpeg(scenes: list, output_path: str, ffmpeg_exe: str):
+    """Generate one AI image per scene and stitch into an MP4 with FFmpeg."""
     os.makedirs("temp_frames", exist_ok=True)
-    frame_list = os.path.abspath("temp_frames/frames.txt")
+    frame_list_path = "temp_frames/frames.txt"
+    providers = []
 
-    with open(frame_list, "w") as f:
+    with open(frame_list_path, "w") as f:
         for scene in scenes:
-            num = scene.get("scene_number", 1)
-            img_path = os.path.abspath(f"temp_frames/scene_{num}.png")
-            Image.fromarray(create_scene_image(scene)).save(img_path)
-            raw_dur = scene.get("duration_seconds") or 4
-            try:
-                dur = min(int(float(str(raw_dur))), 6)
-            except (ValueError, TypeError):
-                dur = 4
-            f.write(f"file '{img_path}'\n")
-            f.write(f"duration {dur}\n")
-        # last file without duration (FFmpeg concat requirement)
-        last = scenes[-1]
-        last_path = os.path.abspath(f"temp_frames/scene_{last.get('scene_number', 1)}.png")
-        f.write(f"file '{last_path}'\n")
+            num      = scene.get("scene_number") or scene.get("scene", 0)
+            img_path = f"temp_frames/scene_{num}.png"
+            provider = create_scene_image(scene, img_path)
+            providers.append(f"Scene {num}: {provider}")
+            duration = scene.get("duration_seconds") or scene.get("duration", 4)
+            f.write(f"file '{os.path.abspath(img_path)}'\n")
+            f.write(f"duration {duration}\n")
+
+        last     = scenes[-1]
+        last_num = last.get("scene_number") or last.get("scene", 0)
+        f.write(f"file '{os.path.abspath(f'temp_frames/scene_{last_num}.png')}'\n")
+
+    print("[video_generator] Provider summary:\n  " + "\n  ".join(providers))
 
     cmd = [
-        ffmpeg_exe, "-y",
-        "-f", "concat", "-safe", "0", "-i", frame_list,
+        FFMPEG_PATH, "-y",
+        "-f", "concat", "-safe", "0",
+        "-i", frame_list_path,
         "-vf", "scale=1280:720,format=yuv420p",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "22", "-r", str(FPS),
+        "-c:v", "libx264", "-r", "24",
         output_path,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg error:\n{result.stderr[-2000:]}")
+        raise Exception(f"FFmpeg error: {result.stderr}")
 
-
+    return output_path

@@ -9,3 +9,9 @@ __pycache__/
 .env.local
 
 .streamlit/secrets.toml
+
+.vscode
+.claude
+
+_pycache_/
+
