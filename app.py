@@ -2,27 +2,23 @@ import streamlit as st
 import json
 from agent import run_pipeline
 
-# ─────────────────────────────────────────────
-# Page config
-# ─────────────────────────────────────────────
+
+#page config
 st.set_page_config(
     page_title="Velora AI",
     page_icon="🎬",
     layout="wide"
 )
 
-# ─────────────────────────────────────────────
-# Header
-# ─────────────────────────────────────────────
+#main header
 st.markdown("# 🎬 Velora AI")
 st.markdown("##### Script → Storyboard → Captions. Powered by an agentic AI pipeline.")
 st.divider()
 
-# ─────────────────────────────────────────────
-# Sidebar — user controls
-# ─────────────────────────────────────────────
+
+#sidebar
 with st.sidebar:
-    st.markdown("## ⚙️ Controls")
+    st.markdown("## Controls")
     st.markdown("Customise your video output below.")
 
     style = st.selectbox(
@@ -48,11 +44,10 @@ with st.sidebar:
     st.markdown("")
     st.caption("Traces visible on smith.langchain.com")
 
-# ─────────────────────────────────────────────
-# Main — script input
-# ─────────────────────────────────────────────
+
+#main script input area
 script = st.text_area(
-    "📝 Paste your script here",
+    "Paste your script here",
     height=220,
     placeholder="""Example: Climate change is reshaping our world at an alarming pace. 
 Glaciers are melting, sea levels are rising, and extreme weather events are 
@@ -63,22 +58,21 @@ The question is no longer whether we can act — it's whether we will."""
 
 col1, col2, col3 = st.columns([1, 1, 3])
 with col1:
-    generate = st.button("🎬 Generate Storyboard", type="primary", use_container_width=True)
+    generate = st.button("Generate Storyboard", type="primary", use_container_width=True)
 with col2:
-    clear = st.button("🗑️ Clear", use_container_width=True)
+    clear = st.button("Clear", use_container_width=True)
 
 if clear:
     st.session_state.clear()
     st.rerun()
 
-# ─────────────────────────────────────────────
-# Pipeline execution
-# ─────────────────────────────────────────────
+
+#pipeline execution
 if generate:
     if not script.strip():
         st.warning("Please paste a script first.")
     else:
-        with st.spinner("🤖 Velora agent is working... check your terminal to watch it think!"):
+        with st.spinner("Velora agent is working... check your terminal to watch it think!"):
             try:
                 scenes, coherence = run_pipeline(script, style, num_scenes)
                 st.session_state['scenes'] = scenes
@@ -88,9 +82,8 @@ if generate:
                 st.error(f"Something went wrong: {str(e)}")
                 st.stop()
 
-# ─────────────────────────────────────────────
-# Show results if scenes exist in session
-# ─────────────────────────────────────────────
+
+#show results if scenes exist in session
 if 'scenes' in st.session_state and st.session_state['scenes']:
     scenes = st.session_state['scenes']
     coherence = st.session_state.get('coherence', {})
@@ -101,11 +94,11 @@ if 'scenes' in st.session_state and st.session_state['scenes']:
     arc = coherence.get("arc_quality", "unknown")
 
     if score >= 80:
-        st.success(f"✅ Coherence Score: **{score}/100** — Arc quality: **{arc}**")
+        st.success(f"Coherence Score: **{score}/100** — Arc quality: **{arc}**")
     elif score >= 60:
-        st.warning(f"⚠️ Coherence Score: **{score}/100** — Arc quality: **{arc}**")
+        st.warning(f"Coherence Score: **{score}/100** — Arc quality: **{arc}**")
     else:
-        st.error(f"❌ Coherence Score: **{score}/100** — Arc quality: **{arc}**")
+        st.error(f"Coherence Score: **{score}/100** — Arc quality: **{arc}**")
 
     if coherence.get("issues"):
         with st.expander("🔍 Coherence issues the agent detected and fixed"):
@@ -147,7 +140,7 @@ if 'scenes' in st.session_state and st.session_state['scenes']:
 
     # JSON export
     st.divider()
-    with st.expander("📦 Export raw storyboard JSON"):
+    with st.expander("Export raw storyboard JSON"):
         st.json(scenes)
         st.download_button(
             "⬇️ Download JSON",
@@ -156,11 +149,10 @@ if 'scenes' in st.session_state and st.session_state['scenes']:
             mime="application/json"
         )
 
-    # ─────────────────────────────────────────────
-    # Video generation section
-    # ─────────────────────────────────────────────
+
+    #video generation 
     st.divider()
-    st.markdown("### 🎥 Generate Video")
+    st.markdown("### Generate Video")
     st.caption("Converts your storyboard into a downloadable MP4 slideshow")
 
     if st.button("🎬 Export as MP4", type="secondary"):
