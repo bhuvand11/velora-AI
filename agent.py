@@ -8,19 +8,15 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 load_dotenv()
 
-# ─────────────────────────────────────────────
-# LLM — GitHub Models
-# ─────────────────────────────────────────────
 
-
+#LLM Model
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     groq_api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# ─────────────────────────────────────────────
-# TOOL 1 — Script → Storyboard
-# ─────────────────────────────────────────────
+
+#Tool 1: Script -> Storyboard
 @tool
 def storyboard_generator(script: str, num_scenes: int = 5) -> str:
     """Takes a script and splits it into num_scenes scenes with shot descriptions, captions, duration and mood."""
@@ -42,9 +38,7 @@ Script:
     return resp.content
 
 
-# ─────────────────────────────────────────────
-# TOOL 2 — Coherence Checker
-# ─────────────────────────────────────────────
+#Tool 2: Coherence Checker
 @tool
 def coherence_checker(storyboard_json: str) -> str:
     """Checks if the storyboard tells a coherent story. Returns score and issues."""
@@ -73,9 +67,7 @@ Storyboard:
     return resp.content
 
 
-# ─────────────────────────────────────────────
-# TOOL 3 — Caption Styler
-# ─────────────────────────────────────────────
+#Tool 3: Caption Styler
 @tool
 def caption_styler(storyboard_json: str, style: str) -> str:
     """Rewrites captions in the storyboard to match the given style."""
@@ -105,9 +97,7 @@ Storyboard:
     return resp.content
 
 
-# ─────────────────────────────────────────────
-# TOOL 4 — Scene Regenerator
-# ─────────────────────────────────────────────
+#Tool 4: Scene Regenerator
 @tool
 def scene_regenerator(weak_scene_number: int, issue: str, full_storyboard_json: str) -> str:
     """Fixes a specific weak scene based on coherence checker feedback."""
@@ -128,9 +118,8 @@ Return ONLY valid JSON. No markdown. No explanation.
     return resp.content
 
 
-# ─────────────────────────────────────────────
-# AGENT SETUP
-# ─────────────────────────────────────────────
+
+#Agent Setup
 tools = [
     storyboard_generator,
     coherence_checker,
@@ -177,9 +166,9 @@ agent_executor = AgentExecutor(
 )
 
 
-# ─────────────────────────────────────────────
-# run_pipeline — called by app.py
-# ─────────────────────────────────────────────
+
+#run_pipeline takes the user input and runs the agent through all steps, 
+#returning the final storyboard and coherence report.
 def run_pipeline(script: str, style: str, num_scenes: int) -> tuple:
     result = agent_executor.invoke({
         "input": f"""
